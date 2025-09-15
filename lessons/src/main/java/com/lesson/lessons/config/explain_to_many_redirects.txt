@@ -1,0 +1,124 @@
+Spring Security Setup Overview
+==============================
+
+Project Summary:
+----------------
+This Spring Boot application implements a secure, stateless REST API using Spring Security and JWT. User registration is supported. Authentication will be performed via a custom login endpoint that issues a JWT.
+
+Key Components:
+---------------
+
+1. SecurityConfig.java
+-----------------------
+- Configures Spring Security's HTTP security filter chain.
+- Disables CSRF protection (appropriate for APIs).
+- Sets the session policy to STATELESS (no HTTP sessions).
+- Permits unauthenticated access to "/auth/**" endpoints.
+- Requires authentication for all other endpoints.
+- Temporarily uses HTTP Basic auth for testing (will be replaced with JWT).
+
+2. CustomUserDetailsService.java
+---------------------------------
+- Implements UserDetailsService interface.
+- Loads User entity by email from the database.
+- Converts User into Spring Security’s UserDetails.
+
+3. AuthController.java
+-----------------------
+- Provides public API endpoint at POST /auth/register.
+- Accepts user data and registers a new user.
+- Delegates creation to UserService.
+
+4. UserService.java
+---------------------
+- Handles business logic for creating users.
+- Hashes user passwords using BCryptPasswordEncoder.
+- Provides countUsers() to check number of users in DB.
+
+5. UserDto.java
+---------------
+- DTO used for transferring user data.
+- Enforces validation for email and password fields.
+
+6. UserRepository.java
+----------------------
+- Extends Spring Data JPA repository.
+- Provides methods like findByEmail() and count().
+
+7. DataInitializer.java (or CommandLineRunner in main)
+-------------------------------------------------------
+- Checks if any users exist in the DB at app startup.
+- If none found, creates a default test user.
+  Email: admin@example.com
+  Password: admin123
+
+Security Behavior:
+------------------
+- /auth/register is open to everyone.
+- All other endpoints are protected and require authentication.
+- Default login is temporarily supported using HTTP Basic.
+- JWT-based login and filter are expected to be added next.
+
+Next Steps:
+-----------
+1. Add /auth/login endpoint that validates credentials and returns JWT.
+2. Create JWT filter to validate Authorization headers on incoming requests.
+3. Replace basic auth with JWT authentication.
+
+
+
+=====================================================================
+Understanding the "Too Many Redirects" Error in Spring Boot Security
+=====================================================================
+
+Overview:
+---------
+The "Too Many Redirects" error (also known as a redirect loop) typically happens in Spring Security when the app keeps redirecting the user back and forth between pages — usually the login page — without ever reaching the intended destination.
+
+This error can make it impossible to load any protected resource, and it often appears as a browser error or in server logs.
+
+Root Cause:
+-----------
+The problem usually arises from **misconfiguring Spring Security’s login mechanism**, especially when using REST APIs without proper login pages or with incorrect security rules.
+
+In this project's case, the issue was caused by:
+
+1. **Form Login Enabled Without a Real Login Page**:
+   - In the SecurityConfig, we had:
+     `.formLogin().loginPage("/auth/login")`
+   - This tells Spring Security to redirect unauthenticated users to `/auth/login`.
+
+2. **But No HTML Page Exists at /auth/login**:
+   - Since this is a REST API (no UI), there was no actual login form at `/auth/login`.
+   - So Spring Security redirects to `/auth/login`, which itself is protected, causing Spring to redirect again to `/auth/login`... forever.
+
+3. **Loop Ensues**:
+   - Every redirect tries to go to a login page that doesn't exist or requires auth.
+   - The browser or server detects this infinite loop and throws the "Too Many Redirects" error.
+
+How to Fix It:
+--------------
+There are two correct ways to fix the issue, depending on what kind of application you're building:
+
+1. For APIs (like this project):
+   - Disable form login entirely.
+   - Use stateless JWT or HTTP Basic authentication.
+   - Example:
+     ```
+     .csrf(csrf -> csrf.disable())
+     .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+     .authorizeHttpRequests(auth -> auth.requestMatchers("/auth/**").permitAll().anyRequest().authenticated())
+     ```
+
+2. For Web Applications with a real HTML login page:
+   - Make sure the URL passed to `.loginPage("/custom-path")` points to a real, publicly accessible HTML page.
+   - Also make sure that page is not protected by authentication.
+
+Why This Is Important:
+----------------------
+Understanding this behavior helps prevent confusing bugs when setting up authentication. Spring Security is powerful but assumes you know what kind of app you're building (API vs traditional web). Misaligning the configuration leads to errors like this one.
+
+Conclusion:
+-----------
+In short: if you tell Spring Security to use a login page, **you must provide one** — otherwise it redirects in a loop. For APIs, **don’t use form login at all**. Use JWT or Basic Auth with stateless sessions.
+
