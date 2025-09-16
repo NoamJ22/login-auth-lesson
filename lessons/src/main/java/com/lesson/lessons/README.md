@@ -36,7 +36,7 @@ This is a Spring Boot 3 project demonstrating a robust implementation of user au
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repository-url>
+    git clone <lessons-login-managment>
     cd lessons
     ```
 
