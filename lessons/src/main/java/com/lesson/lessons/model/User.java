@@ -38,7 +38,7 @@ public class User {
 
     //eager makes the users come always with all their roles
     //brings it from their join table
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
